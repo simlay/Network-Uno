@@ -144,7 +144,7 @@ class Server():
             connection = self.connectionDictionary[self.playerOrder[playerIndex]]
             message = "[TAKETURN|%s]" % self.playerOrder[playerIndex]
             connection.send(message)
-            playerIndex = (playerIndex + 1) % len(self.playerOrder)
+            #playerIndex = (playerIndex + 1) % len(self.playerOrder)
             time.sleep(1)
 
     def startGame(self):

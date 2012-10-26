@@ -6,6 +6,9 @@ from optparse import OptionParser
 import select
 import re
 import time
+
+from random import choice
+
 cardList = [
                 "R0",
                 "R1", "R1",
@@ -78,11 +81,6 @@ class Server():
         self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server.setblocking(0)
 
-        print len(cardList)
-
-
-
-
         serverAddress = ('localhost', self.port)
 
         self.server.bind(serverAddress)
@@ -91,23 +89,73 @@ class Server():
 
     def sendPlayerList(self):
         for connection in self.playerList:
-            message = "[players|"
+            message = "[PLAYERS|"
             for playerName in self.playerList.values():
-                message = message + "," + playerName
-            message = message + "]"
+                message = message + playerName + ","
+            message = message[:-1] + "]"
             connection.send(message)
 
     def sendStartList(self):
         for connection in self.playerList:
-            message = "[start|"
+            message = "[START|"
             for playerName in self.playerList.values():
-                message = message + "," + playerName
-            message = message + "]"
+                message = message + playerName + ","
+            message = message[:-1] + "]"
             connection.send(message)
+
+    def dealCards(self):
+        self.playerCards = {}
+
+        self.cardStack = cardList
+        for player in self.playerList.values():
+            cards = []
+            for i in xrange(7):
+                newCard = choice(self.cardStack)
+                cards.append(newCard)
+                self.cardStack.remove(newCard)
+
+            self.playerCards[player] = cards
+
+        topCard = choice(self.cardStack)
+        self.discardPile = [topCard]
+        self.cardStack.remove(topCard)
+
+        for connection in self.playerList:
+            message = "[DEAL|"
+            for card in self.playerCards[self.playerList[connection]]:
+                message = message + card + ","
+            message = message[:-1] + "]"
+            connection.send(message)
+
+            message = "[TOP|%s]" % topCard
+            connection.send(message)
+
+
+    def playGame(self):
+        self.playerOrder = self.playerList.values()
+
+        # Lets get the dictionary of player names to connections.
+        self.connectionDictionary = {}
+        for connection in self.playerList:
+            self.connectionDictionary[self.playerList[connection]] = connection
+        playerIndex = 0
+        while True:
+
+            connection = self.connectionDictionary[self.playerOrder[playerIndex]]
+            message = "[TAKETURN|%s]" % self.playerOrder[playerIndex]
+            connection.send(message)
+            playerIndex = (playerIndex + 1) % len(self.playerOrder)
+            time.sleep(1)
 
     def startGame(self):
         self.sendStartList()
         print "STARTING A GAME WITH %s" % self.playerList.values()
+
+        # Do shuffling, and send cards.
+        self.dealCards()
+
+        # Lets play the game!
+        self.playGame()
 
     def lobby(self):
         # Get some sockets!
@@ -142,7 +190,7 @@ class Server():
                 else:
                     data = s.recv(1024)
                     if data:
-                        m = re.search("(?<=\[join\|)[a-zA-Z0-9_]+", data)
+                        m = re.search("(?<=\[JOIN\|)[a-zA-Z0-9_]+", data)
                         if m:
                             # Get the player name.
                             playerName = m.group(0)
@@ -155,7 +203,9 @@ class Server():
                             if s not in self.playerList:
                                 self.playerList[s] = playerName
                                 print "Player %s was added!" % playerName
-                                s.send("[accept|%s]" % playerName)
+                                s.send("[ACCEPT|%s]" % playerName)
+                                # Send the player list just as exiting the lobby.
+                                self.sendPlayerList()
 
                                 # Start off the counter!
                                 if len(self.playerList) >= self.minPlayers:
@@ -174,8 +224,6 @@ class Server():
                             self.playerList.pop(s)
                             s.close()
 
-        # Send the player list just as exiting the lobby.
-        self.sendPlayerList()
 
 
     def run(self):

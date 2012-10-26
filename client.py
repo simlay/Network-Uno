@@ -4,6 +4,7 @@ import socket
 #import sys
 from optparse import OptionParser
 import time
+import re
 
 class Client():
     def __init__(self, hostname, port, username):
@@ -11,14 +12,34 @@ class Client():
         self.port = port
         self.username = username
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+
+    def waitForGame(self):
+        while True:
+            self.data = self.s.recv(1024)
+            print self.data
+            time.sleep(1)
+    def waitInLobby(self):
+
+        while True:
+            self.s.send("[JOIN|%s]" % self.username)
+            self.data = self.s.recv(1024)
+            m = re.search("(?<=\[ACCEPT\|)[a-zA-Z0-9_]+", self.data)
+            # Were we accepted?
+            if m:
+                self.data = re.sub("ACCEPT[a-zA-Z0-9_]+", "", self.data)
+                break
+            print self.data
+            # Let's just print it.
+
+            time.sleep(1)
+
+
     def run(self):
         serverAddress = (self.hostname, self.port)
         self.s.connect(serverAddress)
-        while True:
-            self.s.send("[join|%s]" % self.username)
-            data = self.s.recv(1024)
-            print data
-            time.sleep(1)
+        self.waitInLobby()
+        self.waitForGame()
 
 if __name__ == "__main__":
     parser = OptionParser()

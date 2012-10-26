@@ -6,7 +6,66 @@ from optparse import OptionParser
 import select
 import re
 import time
+cardList = [
+                "R0",
+                "R1", "R1",
+                "R2", "R2",
+                "R3", "R3",
+                "R4", "R4",
+                "R5", "R5",
+                "R6", "R6",
+                "R7", "R7",
+                "R8", "R8",
+                "R9", "R9",
+                "RD", "RD",
+                "RS", "RS",
+                "RR", "RR",
 
+                "B0",
+                "B1", "B1",
+                "B2", "B2",
+                "B3", "B3",
+                "B4", "B4",
+                "B5", "B5",
+                "B6", "B6",
+                "B7", "B7",
+                "B8", "B8",
+                "B9", "B9",
+                "BD", "BD",
+                "BS", "BS",
+                "BR", "BR",
+
+                "Y0",
+                "Y1", "Y1",
+                "Y2", "Y2",
+                "Y3", "Y3",
+                "Y4", "Y4",
+                "Y5", "Y5",
+                "Y6", "Y6",
+                "Y7", "Y7",
+                "Y8", "Y8",
+                "Y9", "Y9",
+                "YD", "YD",
+                "YS", "YS",
+                "YR", "YR",
+
+                "G0",
+                "G1", "G1",
+                "G2", "G2",
+                "G3", "G3",
+                "G4", "G4",
+                "G5", "G5",
+                "G6", "G6",
+                "G7", "G7",
+                "G8", "G8",
+                "G9", "G9",
+                "GD", "GD",
+                "GS", "GS",
+                "GR", "GR",
+
+                "NW", "NW", "NW", "NW",
+                "NF", "NF", "NF", "NF",
+                ]
 
 class Server():
     def __init__(self, port, time, minPlayers, maxPlayers, maxLobby):
@@ -18,6 +77,11 @@ class Server():
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server.setblocking(0)
+
+        print len(cardList)
+
+
+
 
         serverAddress = ('localhost', self.port)
 
@@ -33,7 +97,16 @@ class Server():
             message = message + "]"
             connection.send(message)
 
+    def sendStartList(self):
+        for connection in self.playerList:
+            message = "[start|"
+            for playerName in self.playerList.values():
+                message = message + "," + playerName
+            message = message + "]"
+            connection.send(message)
+
     def startGame(self):
+        self.sendStartList()
         print "STARTING A GAME WITH %s" % self.playerList.values()
 
     def lobby(self):
@@ -50,10 +123,11 @@ class Server():
         # For the countDown.
         countDownTime = int(time.time())
 
-        while int(time.time()) - countDownTime < self.lobbyTime\
-              or len(self.playerList) < self.minPlayers:
+        while int(time.time()) - countDownTime < self.lobbyTime or len(self.playerList) < self.minPlayers:
 
-            sys.stderr.write("\r %s %s" % (countDownTime, int(time.time())))
+            if len(self.playerList) >= self.minPlayers:
+                sys.stderr.write("\r%s" % (self.lobbyTime - (int(time.time()) - countDownTime)))
+
             readable, writable, exceptional = select.select(inputs, outputs, inputs)
             for s in readable:
                 if s is server:

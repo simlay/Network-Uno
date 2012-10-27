@@ -52,16 +52,49 @@ class Client():
             print self.playerList
         print "CLIENT EXITING THE LOBBY!"
 
+
+
+    # Send a valid card to play.
+    def makeTurn(self):
+        cardToPlay = self.myCards[0]
+        self.myCards.remove(cardToPlay)
+        message = "[PLAY|%s]" % cardToPlay
+        self.s.send(message)
+
+    # For playing a game.
     def playGame(self):
         self.myCards = []
+
         while True:
             self.data = self.s.recv(1024)
+
+            # HAVE I BEEN DEALT?
             m = re.search("(?<=\[DEAL\|)([A-Z0-9]+\,?)+", self.data)
             if m:
                 self.myCards = self.myCards + m.group(0).split(",")
                 print "MY CARDS ARE %s" % self.myCards
                 self.data = re.sub("\[DEAL\|([A-Z0-9]+\,?)+\]", "", self.data)
+
+            # WHAT'S THE TOP?
+            m = re.search("(?<=\[TOP\|)[A-Z0-9]+", self.data)
+            if m:
+                self.topCard = m.group(0)
+                print "THE TOP CARD IS %s" % self.topCard
+                self.data = re.sub("\[TOP\|[a-zA-Z0-9]+\]", "", self.data)
+
+            # IS IT A TURN?
+            m = re.search("(?<=\[TAKETURN\|)[a-zA-Z0-9_]+", self.data)
+            if m:
+                myTurn = m.group(0) == self.username
+                self.data = re.sub("\[TAKETURN\|[a-zA-Z0-9_]+\]", "", self.data)
+
+                if myTurn:
+                    print "IT'S MY TURN!"
+                    self.makeTurn()
+                    # LET'S MAKE A MOVE!
+
             print self.data
+
             time.sleep(1)
 
     def run(self):

@@ -130,6 +130,8 @@ class Server():
             message = "[TOP|%s]" % topCard
             connection.send(message)
 
+    def validateCard(self, card):
+        return True
 
     def playGame(self):
         self.playerOrder = self.playerList.values()
@@ -141,9 +143,21 @@ class Server():
         playerIndex = 0
         while True:
 
-            connection = self.connectionDictionary[self.playerOrder[playerIndex]]
-            message = "[TAKETURN|%s]" % self.playerOrder[playerIndex]
+            playerName = self.playerOrder[playerIndex]
+            connection = self.connectionDictionary[playerName]
+
+            message = "[TAKETURN|%s]" % playerName
             connection.send(message)
+            try:
+                data = connection.recv(1024)
+                m = re.search("(?<=\[PLAY\|)[A-Z0-9]+", data)
+                if m:
+                    card = m.group(0)
+
+            except:
+                None
+
+
             #playerIndex = (playerIndex + 1) % len(self.playerOrder)
             time.sleep(1)
 

@@ -82,10 +82,10 @@ class Client():
                 self.data = re.sub("\[TOP\|[a-zA-Z0-9]+\]", "", self.data)
 
             # IS IT A TURN?
-            m = re.search("(?<=\[TAKETURN\|)[a-zA-Z0-9_]+", self.data)
+            m = re.search("(?<=\[GO\|)[a-zA-Z0-9_]+", self.data)
             if m:
                 myTurn = m.group(0) == self.username
-                self.data = re.sub("\[TAKETURN\|[a-zA-Z0-9_]+\]", "", self.data)
+                self.data = re.sub("\[GO\|[a-zA-Z0-9_]+\]", "", self.data)
 
                 if myTurn:
                     print "IT'S MY TURN!"

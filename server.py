@@ -148,7 +148,7 @@ class Server():
             playerName = self.playerOrder[playerIndex]
             connection = self.connectionDictionary[playerName]
 
-            message = "[TAKETURN|%s]" % playerName
+            message = "[GO|%s]" % playerName
             connection.send(message)
             data = ""
             try:

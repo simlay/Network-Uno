@@ -52,13 +52,12 @@ class Client():
             print self.playerList
         print "CLIENT EXITING THE LOBBY!"
 
-
-
     # Send a valid card to play.
     def makeTurn(self):
         cardToPlay = self.myCards[0]
         self.myCards.remove(cardToPlay)
         message = "[PLAY|%s]" % cardToPlay
+        print message
         self.s.send(message)
 
     # For playing a game.
@@ -113,12 +112,14 @@ if __name__ == "__main__":
                       type="int",
                       metavar="NUMBER",
                       default=36741)
+
     parser.add_option("--host",
                       dest="hostname",
                       help="hostname to connect to",
                       type="string",
                       metavar="STRING",
                       default="localhost")
+
     parser.add_option("-u",
                       "--username",
                       dest="username",
@@ -126,6 +127,7 @@ if __name__ == "__main__":
                       type="string",
                       metavar="STRING",
                       default="simlay")
+
     (options, args) = parser.parse_args()
 
 

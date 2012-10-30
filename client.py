@@ -17,7 +17,7 @@ class Client():
     def waitForGame(self):
         print "CLIENT WAITING FOR GAME TO START!"
         while True:
-            self.data = self.s.recv(1024)
+            self.data = self.data + self.s.recv(1024)
             m = re.search("(?<=\[START\|)([a-zA-Z0-9]+\,?)+", self.data)
             if m:
                 self.playerList = m.group(0).split(",")
@@ -33,6 +33,7 @@ class Client():
         while True:
             self.s.send("[JOIN|%s]" % self.username)
             self.data = self.s.recv(1024)
+
             m = re.search("(?<=\[ACCEPT\|)[a-zA-Z0-9_]+", self.data)
             # Were we accepted?
             if m:
@@ -78,7 +79,6 @@ class Client():
             m = re.search("(?<=\[TOP\|)[A-Z0-9]+", self.data)
             if m:
                 self.topCard = m.group(0)
-                print "THE TOP CARD IS %s" % self.topCard
                 self.data = re.sub("\[TOP\|[a-zA-Z0-9]+\]", "", self.data)
 
             # IS IT A TURN?
@@ -88,11 +88,13 @@ class Client():
                 self.data = re.sub("\[GO\|[a-zA-Z0-9_]+\]", "", self.data)
 
                 if myTurn:
-                    print "IT'S MY TURN!"
-                    self.makeTurn()
+                    #print "IT'S MY TURN!"
                     # LET'S MAKE A MOVE!
+                    self.makeTurn()
 
-            print self.data
+            m = re.search("(?<=\[GG\|)[a-zA-Z0-9_]+", self.data)
+            if self.data != "":
+                print self.data
 
             time.sleep(1)
 

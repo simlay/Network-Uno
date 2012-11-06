@@ -130,11 +130,12 @@ class Server():
             connection.send(message)
 
     def validateCard(self, testCard):
-        print "Topcard: %s, TestCard: %s" % (self.discardPile[:-1], testCard)
+        #print "Topcard: %s, TestCard: %s" % (self.discardPile[-1], testCard)
         return True
 
     def playGame(self):
         self.playerOrder = self.playerList.values()
+        time.sleep(1)
 
         # Lets get the dictionary of player names to connections.
         self.connectionDictionary = {}
@@ -143,18 +144,25 @@ class Server():
         playerIndex = 0
         playDirection = 1
         data = ""
-        while True:
+        for i in xrange(5):
+        #while True:
 
             playerName = self.playerOrder[playerIndex]
             connection = self.connectionDictionary[playerName]
 
             message = "[GO|%s]" % playerName
+            print playerName, message
             connection.send(message)
-            try:
-                # Let's try to get some data.
-                data = data + connection.recv(1024)
-            except:
-                None
+            while True:
+                try:
+                    # Let's try to get some data.
+                    data = data + connection.recv(1024)
+                    break
+                except:
+                    None
+
+            if data != "":
+                print data
 
             m = re.search("(?<=\[PLAY\|)[A-Z0-9]+", data)
             if m:
@@ -165,13 +173,18 @@ class Server():
                     message = "[PLAYED|%s,%s]" % (playerName, card)
 
                     self.broadcast(message)
+                    print self.playerCards[playerName]
                     self.playerCards[playerName].remove(card)
 
                     if len(self.playerCards[playerName]) == 0:
                         self.broadcast("[GG|%s]" % playerName)
                         break
+                else:
+                    message = "[INVALID|CARD NOT VALID]"
+                    connection.send(message)
 
-                data = re.sub("\[PLAY\|[A-Z0-9]+", "", data)
+
+                data = re.sub("\[PLAY\|[A-Z0-9]+\]", "", data)
 
                 #print self.discardPile, playerIndex
             if len(self.playerCards[playerName]) == 1:
@@ -179,6 +192,7 @@ class Server():
 
 
             #playerIndex = (playerIndex + 1) % len(self.playerOrder)
+            #time.sleep(1)
             time.sleep(1)
 
     def startGame(self):
@@ -259,7 +273,7 @@ class Server():
                             inputs.remove(s)
                             self.playerList.pop(s)
                             s.close()
-
+        sys.stderr.write("\r")
 
     def run(self):
         self.lobby()

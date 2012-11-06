@@ -33,14 +33,14 @@ class Client():
         while True:
             self.s.send("[JOIN|%s]" % self.username)
             self.data = self.s.recv(1024)
+            print self.data
 
             m = re.search("(?<=\[ACCEPT\|)[a-zA-Z0-9_]+", self.data)
             # Were we accepted?
             if m:
                 self.username = m.group(0)
-                self.data = re.sub("ACCEPT[a-zA-Z0-9_]+\]", "", self.data)
+                self.data = re.sub("\[ACCEPT\|[a-zA-Z0-9_]+\]", "", self.data)
                 break
-            print self.data
             # Let's just print it.
 
             time.sleep(1)
@@ -55,18 +55,32 @@ class Client():
 
     # Send a valid card to play.
     def makeTurn(self):
-        cardToPlay = self.myCards[0]
-        self.myCards.remove(cardToPlay)
+        cardToPlay = "NN"
+        if len(self.myCards) > 0:
+            cardToPlay = choice(self.myCards)
+            #self.myCards.remove(cardToPlay)
+        #else:
+        #    self.s.send("[PLAY|NN]")
         message = "[PLAY|%s]" % cardToPlay
-        print message
         self.s.send(message)
+        while True:
+            this.data = this.data + this.s.recv(1024)
+            m = re.search("(?<=\[PLAYED\|)[a-zA-Z0-9]+,[A-Z0-9]+", this.data)
+            if m:
+                this.data = re.sub("\[PLAYED\|[a-zA-Z0-9]+,[A-Z0-9]+\]", "", this.data)
+                break
+            #m = re.search
+            time.sleep(1)
+
 
     # For playing a game.
     def playGame(self):
         self.myCards = []
 
         while True:
-            self.data = self.s.recv(1024)
+            self.data = self.data + self.s.recv(1024)
+            if self.data != "":
+                print self.data
 
             # HAVE I BEEN DEALT?
             m = re.search("(?<=\[DEAL\|)([A-Z0-9]+\,?)+", self.data)
@@ -76,10 +90,10 @@ class Client():
                 self.data = re.sub("\[DEAL\|([A-Z0-9]+\,?)+\]", "", self.data)
 
             # WHAT'S THE TOP?
-            m = re.search("(?<=\[TOP\|)[A-Z0-9]+", self.data)
-            if m:
-                self.topCard = m.group(0)
-                self.data = re.sub("\[TOP\|[a-zA-Z0-9]+\]", "", self.data)
+            #m = re.search("(?<=\[TOP\|)[A-Z0-9]+", self.data)
+            #if m:
+            #    self.topCard = m.group(0)
+            #    self.data = re.sub("\[TOP\|[a-zA-Z0-9]+\]", "", self.data)
 
             # IS IT A TURN?
             m = re.search("(?<=\[GO\|)[a-zA-Z0-9_]+", self.data)
@@ -93,10 +107,11 @@ class Client():
                     self.makeTurn()
 
             m = re.search("(?<=\[GG\|)[a-zA-Z0-9_]+", self.data)
-            if self.data != "":
-                print self.data
+            if m:
+                self.data = re.sub("\[GG\|[a-zA-Z0-9_]+\]", "", self.data)
+                break
 
-            time.sleep(1)
+            #time.sleep(1)
 
     def run(self):
         serverAddress = (self.hostname, self.port)

@@ -5,6 +5,7 @@ import socket
 from optparse import OptionParser
 import time
 import re
+from random import choice
 
 class Client():
     def __init__(self, hostname, port, username):
@@ -12,6 +13,7 @@ class Client():
         self.port = port
         self.username = username
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        #socket.setdefaulttimeout(0)
 
 
     def waitForGame(self):
@@ -54,24 +56,54 @@ class Client():
         print "CLIENT EXITING THE LOBBY!"
 
     # Send a valid card to play.
-    def makeTurn(self):
-        cardToPlay = "NN"
-        if len(self.myCards) > 0:
-            cardToPlay = choice(self.myCards)
-            #self.myCards.remove(cardToPlay)
-        #else:
-        #    self.s.send("[PLAY|NN]")
-        message = "[PLAY|%s]" % cardToPlay
-        self.s.send(message)
-        while True:
-            this.data = this.data + this.s.recv(1024)
-            m = re.search("(?<=\[PLAYED\|)[a-zA-Z0-9]+,[A-Z0-9]+", this.data)
-            if m:
-                this.data = re.sub("\[PLAYED\|[a-zA-Z0-9]+,[A-Z0-9]+\]", "", this.data)
-                break
-            #m = re.search
-            time.sleep(1)
+    def makeTurn(self, topCard):
+        def chooseCard(topCard):
+            cardToPlay = "NN"
+            cardToRemove = cardToPlay
+            for card in self.myCards:
+                if card[0] == "N":
+                    cardToPlay = choice(["G", "B", "R", "Y"]) + card[1]
+                    cardToRemove = card
+                    break
+                elif card[0] == topCard[0] or card[1] == topCard[1]:
+                    cardToPlay = card
+                    cardToRemove = card
+                    break
+            return cardToPlay, cardToRemove
 
+
+        # Choose a random card!
+        #if len(self.myCards) > 0:
+        #    cardToPlay = choice(self.myCards)
+        cardToPlay, cardToRemove = chooseCard(topCard)
+        self.s.send("[PLAY|%s]" % cardToPlay)
+        if cardToPlay == "NN":
+            self.data = self.data + self.s.recv(1024)
+            m = re.search("(?<=\[DEAL\|)([A-Z0-9]+\,?)+", self.data)
+            if m:
+                self.myCards = self.myCards + m.group(0).split(",")
+                print "MY CARDS ARE %s" % self.myCards
+                self.data = re.sub("\[DEAL\|([A-Z0-9]+\,?)+\]", "", self.data)
+
+            cardToPlay, cardToRemove = chooseCard(topCard)
+            self.s.send("[PLAY|%s]" % cardToPlay)
+
+
+        while True:
+            self.data = self.data + self.s.recv(1024)
+            print self.data
+            m = re.search("(?<=\[PLAYED\|)[a-zA-Z0-9]+,[A-Z0-9]+", self.data)
+            if m:
+                self.data = re.sub("\[PLAYED\|[a-zA-Z0-9]+,[A-Z0-9]+\]", "", self.data)
+                if cardToRemove != "NN":
+                    self.myCards.remove(cardToRemove)
+                return
+            m = re.search("(?<=\[INVALID\|)[^\]]+", self.data)
+            if m:
+                self.data = re.sub("\[INVALID\|[^\]]+\]", "", self.data)
+                cardToPlay, cardToRemove = chooseCard(topCard)
+                self.s.send("[PLAY|%s]" % cardToPlay)
+            time.sleep(1)
 
     # For playing a game.
     def playGame(self):
@@ -89,22 +121,14 @@ class Client():
                 print "MY CARDS ARE %s" % self.myCards
                 self.data = re.sub("\[DEAL\|([A-Z0-9]+\,?)+\]", "", self.data)
 
-            # WHAT'S THE TOP?
-            #m = re.search("(?<=\[TOP\|)[A-Z0-9]+", self.data)
-            #if m:
-            #    self.topCard = m.group(0)
-            #    self.data = re.sub("\[TOP\|[a-zA-Z0-9]+\]", "", self.data)
-
             # IS IT A TURN?
-            m = re.search("(?<=\[GO\|)[a-zA-Z0-9_]+", self.data)
+            m = re.search("(?<=\[GO\|)[A-Z0-9]+", self.data)
             if m:
-                myTurn = m.group(0) == self.username
-                self.data = re.sub("\[GO\|[a-zA-Z0-9_]+\]", "", self.data)
+                topCard = m.group(0)
+                self.data = re.sub("\[GO\|[A-Z0-9]+\]", "", self.data)
+                print "MY TURN!!!!", topCard, self.data
 
-                if myTurn:
-                    #print "IT'S MY TURN!"
-                    # LET'S MAKE A MOVE!
-                    self.makeTurn()
+                self.makeTurn(topCard)
 
             m = re.search("(?<=\[GG\|)[a-zA-Z0-9_]+", self.data)
             if m:

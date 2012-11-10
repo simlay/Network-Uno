@@ -119,8 +119,10 @@ class Server():
             self.playerCards[player] = cards
 
         topCard = choice(self.cardStack)
-        self.discardPile = [topCard]
         self.cardStack.remove(topCard)
+        if topCard[0] == "N":
+            topCard = choice(["G", "R", "Y", "B"]) + topCard[1]
+        self.discardPile = [topCard]
 
         for connection in self.playerList:
             message = "[DEAL|"
@@ -130,8 +132,11 @@ class Server():
             connection.send(message)
 
     def validateCard(self, testCard):
-        #print "Topcard: %s, TestCard: %s" % (self.discardPile[-1], testCard)
-        return True
+        topCard = self.discardPile[-1]
+        if topCard[0] == testCard[0] or topCard[1] == "W" or topCard[1] == "F" or (testCard[1].isdigit() and topCard[1] == testCard[1]):
+            return True
+        else:
+            return False
 
     def playGame(self):
         self.playerOrder = self.playerList.values()
@@ -144,14 +149,12 @@ class Server():
         playerIndex = 0
         playDirection = 1
         data = ""
-        for i in xrange(5):
-        #while True:
+        while True:
 
             playerName = self.playerOrder[playerIndex]
             connection = self.connectionDictionary[playerName]
 
-            message = "[GO|%s]" % playerName
-            print playerName, message
+            message = "[GO|%s]" % self.discardPile[-1]
             connection.send(message)
             while True:
                 try:
@@ -167,22 +170,36 @@ class Server():
             m = re.search("(?<=\[PLAY\|)[A-Z0-9]+", data)
             if m:
                 card = m.group(0)
+                print playerName, message, card, self.playerCards[playerName], self.discardPile
                 if self.validateCard(card):
                     self.discardPile.append(card)
                     playerIndex = (playerIndex + playDirection) % len(self.playerList)
+
                     message = "[PLAYED|%s,%s]" % (playerName, card)
 
                     self.broadcast(message)
-                    print self.playerCards[playerName]
-                    self.playerCards[playerName].remove(card)
+                    if card != "NN":
+                        if card[1] == "F" or card[1] == "W":
+                            print "REMOVING CARD %s" % card
+                            self.playerCards[playerName].remove("N" + card[1])
+                        else:
+                            self.playerCards[playerName].remove(card)
 
                     if len(self.playerCards[playerName]) == 0:
                         self.broadcast("[GG|%s]" % playerName)
                         break
+
+                elif card == "NN":
+                    newCard = choice(self.cardStack)
+                    self.cardStack.remove(newCard)
+
+                    message = "[DEAL|%s]" % newCard
+                    connection.send(message)
+
+                    message = "[GO|%s]" % self.discardPile[-1]
                 else:
                     message = "[INVALID|CARD NOT VALID]"
                     connection.send(message)
-
 
                 data = re.sub("\[PLAY\|[A-Z0-9]+\]", "", data)
 
@@ -208,6 +225,7 @@ class Server():
     def lobby(self):
         # Get some sockets!
         server = self.server
+        #socket.setdefaulttimeout(0)
 
         inputs = [ server ]
         self.playerList = {}

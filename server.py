@@ -133,7 +133,7 @@ class Server():
 
     def validateCard(self, testCard):
         topCard = self.discardPile[-1]
-        if topCard[0] == testCard[0] or topCard[1] == "W" or topCard[1] == "F" or (testCard[1].isdigit() and topCard[1] == testCard[1]):
+        if topCard[0] == testCard[0] or testCard[1] == "W" or testCard[1] == "F" or topCard[1] == testCard[1]:
             return True
         else:
             return False
@@ -192,11 +192,13 @@ class Server():
                 elif card == "NN":
                     newCard = choice(self.cardStack)
                     self.cardStack.remove(newCard)
+                    self.playerCards[playerName].append(newCard)
 
                     message = "[DEAL|%s]" % newCard
                     connection.send(message)
 
                     message = "[GO|%s]" % self.discardPile[-1]
+                    connection.send(message)
                 else:
                     message = "[INVALID|CARD NOT VALID]"
                     connection.send(message)

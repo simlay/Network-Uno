@@ -179,11 +179,16 @@ class Server():
 
                     self.broadcast(message)
                     if card != "NN":
+                        removeCard = card
                         if card[1] == "F" or card[1] == "W":
-                            print "REMOVING CARD %s" % card
-                            self.playerCards[playerName].remove("N" + card[1])
+                            removeCard = "N" + card[1]
+
+                        print "REMOVING CARD %s" % removeCard
+                        if removeCard in self.playerCards[playerName]:
+                            self.playerCards[playerName].remove(removeCard)
                         else:
-                            self.playerCards[playerName].remove(card)
+                            connection.send("[INVALID|YOU DON'T HAVE THAT CARD!]")
+                            connection.send("[GO|%s]" % self.discardPile[-1])
 
                     if len(self.playerCards[playerName]) == 0:
                         self.broadcast("[GG|%s]" % playerName)
@@ -210,7 +215,7 @@ class Server():
                 self.broadcast("[UNO|%s]" % playerName)
 
 
-            #playerIndex = (playerIndex + 1) % len(self.playerOrder)
+            playerIndex = (playerIndex + 1) % len(self.playerOrder)
             #time.sleep(1)
             time.sleep(1)
 

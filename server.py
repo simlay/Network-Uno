@@ -81,7 +81,7 @@ class Server():
         self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server.setblocking(0)
 
-        serverAddress = ('localhost', self.port)
+        serverAddress = (socket.gethostname(), self.port)
 
         self.server.bind(serverAddress)
         self.server.listen(5)
@@ -99,16 +99,17 @@ class Server():
         self.broadcast(message)
 
     def sendStartList(self):
-        message = "[START|"
+        message = "[STARTGAME|"
         for playerName in self.playerList.values():
             message = message + playerName + ","
         message = message[:-1] + "]"
+        #print "SENDING STARTLIST", message
         self.broadcast(message)
 
     def dealCards(self):
         self.playerCards = {}
 
-        self.cardStack = cardList
+        self.cardStack = [x for x in cardList]
         for player in self.playerList.values():
             cards = []
             for i in xrange(7):
@@ -140,7 +141,7 @@ class Server():
 
     def playGame(self):
         self.playerOrder = self.playerList.values()
-        time.sleep(1)
+        #time.sleep(1)
 
         # Lets get the dictionary of player names to connections.
         self.connectionDictionary = {}
@@ -149,7 +150,7 @@ class Server():
         playerIndex = 0
         playDirection = 1
         data = ""
-        inputs = self.connectionDictionary.keys() + [self.server]
+        inputs = self.connectionDictionary.values() + [self.server]
         data_buffer = {}
 
         while True:
@@ -167,6 +168,9 @@ class Server():
                     inputs.append(client)
                 else:
                     new_data = s.recv(1024)
+                    #m = re.search("(?<=\[CHAT\|)[^\[]*", new_data)
+                    #if m:
+                    #    self.broadcast
                     data = data + new_data
                     if s in data_buffer:
                         data_buffer[s] = data_buffer[s] + new_data
@@ -187,8 +191,9 @@ class Server():
             m = re.search("(?<=\[PLAY\|)[A-Z0-9]+", data)
             if m:
                 card = m.group(0)
-                print playerName, message, card, self.playerCards[playerName], self.discardPile
+                #print playerName, message, card, self.playerCards[playerName], self.discardPile
                 if self.validateCard(card):
+                    print "%s played %s" % (playerName, card)
                     self.discardPile.append(card)
                     playerIndex = (playerIndex + playDirection) % len(self.playerList)
 
@@ -203,7 +208,7 @@ class Server():
                         if removeCard in self.playerCards[playerName]:
                             self.playerCards[playerName].remove(removeCard)
                         else:
-                            connection.send("[INVALID|YOU DON'T HAVE THAT CARD!]")
+                            connection.send("[INVALID|YOU DON'T HAVE %s!]" % card)
                             connection.send("[GO|%s]" % self.discardPile[-1])
 
                     if len(self.playerCards[playerName]) == 0:
@@ -211,6 +216,10 @@ class Server():
                         break
 
                 elif card == "NN":
+                    if len(self.cardStack) == 0:
+                        self.broadcast("[GG|%s]" % socket.gethostname())
+                        return
+
                     newCard = choice(self.cardStack)
                     self.cardStack.remove(newCard)
                     self.playerCards[playerName].append(newCard)
@@ -232,7 +241,7 @@ class Server():
 
 
             playerIndex = (playerIndex + 1) % len(self.playerOrder)
-            time.sleep(1)
+            #time.sleep(1)
 
     def startGame(self):
         self.sendStartList()
@@ -300,7 +309,7 @@ class Server():
                                 self.playerList[s] = playerName
                                 print "Player %s was added!" % playerName
                                 message = "[ACCEPT|%s]" % playerName
-                                print "sending message {%s}" % message
+                                #print "sending message {%s}" % message
 
                                 s.send(message)
 
@@ -327,11 +336,12 @@ class Server():
 
     def run(self):
         self.lobby()
-        self.startGame()
+        while True:
+            self.startGame()
 
 
 if __name__ == "__main__":
-    parser = OptionParser()
+    parser = OptionParser(conflict_handler="resolve")
     parser.add_option("-p",
                       "--port",
                       dest="port",

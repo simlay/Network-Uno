@@ -19,7 +19,6 @@ class Client():
     def waitForGame(self):
         print "CLIENT WAITING FOR GAME TO START!"
         while True:
-            self.data = self.data + self.s.recv(1024)
             print self.data
             m = re.search("(?<=\[STARTGAME\|)([a-zA-Z0-9]+\,?)*", self.data)
             if m:
@@ -27,8 +26,9 @@ class Client():
                 self.data = re.sub("\[STARTGAME\|([a-zA-Z0-9]+\,?)*\]", "", self.data)
                 print "STARTING A GAME WITH %s" % self.playerList
                 break
+            self.data = self.data + self.s.recv(1024)
 
-            print self.data
+            #print self.data
         print "STARTING THE GAME"
 
     def waitInLobby(self):
@@ -52,7 +52,6 @@ class Client():
                 self.username = m.group(0)
                 self.data = re.sub("\[WAIT\|[a-zA-Z0-9_]+\]", "", self.data)
                 break
-            # Let's just print it.
 
         # Get the player list. (I'll probably throw this away when I'm done with it.)
         m = re.search("(?<=\[PLAYERS\|)([a-zA-Z0-9]+\,?)+", self.data)
@@ -83,7 +82,6 @@ class Client():
         print "Playing card", cardToPlay
         self.s.send("[PLAY|%s]" % cardToPlay)
         if cardToRemove != "NN":
-            print "Removing card %s given %s" % (cardToRemove, cardToPlay)
             self.myCards.remove(cardToRemove)
 
         return
@@ -171,7 +169,8 @@ class Client():
             self.playGame()
 
 if __name__ == "__main__":
-    parser = OptionParser()
+    #parser = OptionParser()
+    parser = OptionParser(conflict_handler="resolve")
     parser.add_option("-p",
                       "--port",
                       dest="port",
@@ -180,12 +179,12 @@ if __name__ == "__main__":
                       metavar="NUMBER",
                       default=36741)
 
-    parser.add_option("--host",
+    parser.add_option("-h", "--host",
                       dest="hostname",
                       help="hostname to connect to",
                       type="string",
                       metavar="STRING",
-                      default="localhost")
+                      default=socket.gethostname())
 
     parser.add_option("-u",
                       "--username",

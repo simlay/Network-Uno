@@ -22,7 +22,7 @@ cardList = [
                 "R9", "R9",
                 "RD", "RD",
                 "RS", "RS",
-                "RR", "RR",
+                "RU", "RU",
 
                 "B0",
                 "B1", "B1",
@@ -36,7 +36,7 @@ cardList = [
                 "B9", "B9",
                 "BD", "BD",
                 "BS", "BS",
-                "BR", "BR",
+                "BU", "BU",
 
                 "Y0",
                 "Y1", "Y1",
@@ -50,7 +50,7 @@ cardList = [
                 "Y9", "Y9",
                 "YD", "YD",
                 "YS", "YS",
-                "YR", "YR",
+                "YU", "YU",
 
                 "G0",
                 "G1", "G1",
@@ -64,7 +64,7 @@ cardList = [
                 "G9", "G9",
                 "GD", "GD",
                 "GS", "GS",
-                "GR", "GR",
+                "GU", "GU",
 
                 "NW", "NW", "NW", "NW",
                 "NF", "NF", "NF", "NF",
@@ -149,6 +149,9 @@ class Server():
         playerIndex = 0
         playDirection = 1
         data = ""
+        inputs = self.connectionDictionary.keys() + [self.server]
+        data_buffer = {}
+
         while True:
 
             playerName = self.playerOrder[playerIndex]
@@ -156,13 +159,27 @@ class Server():
 
             message = "[GO|%s]" % self.discardPile[-1]
             connection.send(message)
-            while True:
-                try:
-                    # Let's try to get some data.
-                    data = data + connection.recv(1024)
-                    break
-                except:
-                    None
+            readable, writable, exceptional = select.select(inputs, [], [])
+            for s in readable:
+                # A new connection?
+                if s == self.server:
+                    client, address = self.server.accept()
+                    inputs.append(client)
+                else:
+                    new_data = s.recv(1024)
+                    data = data + new_data
+                    if s in data_buffer:
+                        data_buffer[s] = data_buffer[s] + new_data
+                    else:
+                        data_buffer[s] = new_data
+
+            #while True:
+            #    try:
+            #        # Let's try to get some data.
+            #        data = data + connection.recv(1024)
+            #        break
+            #    except:
+            #        None
 
             if data != "":
                 print data
@@ -183,7 +200,6 @@ class Server():
                         if card[1] == "F" or card[1] == "W":
                             removeCard = "N" + card[1]
 
-                        print "REMOVING CARD %s" % removeCard
                         if removeCard in self.playerCards[playerName]:
                             self.playerCards[playerName].remove(removeCard)
                         else:
@@ -216,7 +232,6 @@ class Server():
 
 
             playerIndex = (playerIndex + 1) % len(self.playerOrder)
-            #time.sleep(1)
             time.sleep(1)
 
     def startGame(self):
@@ -245,10 +260,12 @@ class Server():
         countDownTime = int(time.time())
         data = ""
 
+        self.data_buffer = {}
+
         while int(time.time()) - countDownTime < self.lobbyTime or len(self.playerList) < self.minPlayers:
 
             if len(self.playerList) >= self.minPlayers:
-                sys.stderr.write("\r%s" % (self.lobbyTime - (int(time.time()) - countDownTime)))
+                sys.stderr.write("\rStarting in %s" % (self.lobbyTime - (int(time.time()) - countDownTime)))
 
             readable, writable, exceptional = select.select(inputs, outputs, inputs)
             for s in readable:
@@ -262,7 +279,12 @@ class Server():
                     # Write player list to new connection.
 
                 else:
-                    data = data + s.recv(1024)
+                    if s in self.data_buffer:
+                        self.data_buffer[s] = self.data_buffer[s] + s.recv(1024)
+                    else:
+                        self.data_buffer[s] = s.recv(1024)
+
+                    data = self.data_buffer[s]
                     if data:
                         m = re.search("(?<=\[JOIN\|)[a-zA-Z0-9_]+", data)
                         if m:
@@ -277,7 +299,10 @@ class Server():
                             if s not in self.playerList:
                                 self.playerList[s] = playerName
                                 print "Player %s was added!" % playerName
-                                s.send("[ACCEPT|%s]" % playerName)
+                                message = "[ACCEPT|%s]" % playerName
+                                print "sending message {%s}" % message
+
+                                s.send(message)
 
                                 # Send the player list just as exiting the lobby.
                                 self.sendPlayerList()

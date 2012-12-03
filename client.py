@@ -20,20 +20,23 @@ class Client():
         print "CLIENT WAITING FOR GAME TO START!"
         while True:
             self.data = self.data + self.s.recv(1024)
-            m = re.search("(?<=\[START\|)([a-zA-Z0-9]+\,?)+", self.data)
+            print self.data
+            m = re.search("(?<=\[STARTGAME\|)([a-zA-Z0-9]+\,?)*", self.data)
             if m:
                 self.playerList = m.group(0).split(",")
-                self.data = re.sub("\[START\|([a-zA-Z0-9]+\,?)+\]", "", self.data)
+                self.data = re.sub("\[STARTGAME\|([a-zA-Z0-9]+\,?)*\]", "", self.data)
                 print "STARTING A GAME WITH %s" % self.playerList
                 break
 
             print self.data
-            time.sleep(1)
+        print "STARTING THE GAME"
 
     def waitInLobby(self):
 
         while True:
-            self.s.send("[JOIN|%s]" % self.username)
+            message = "[JOIN|%s]" % self.username
+            #print "writing message {%s}" % message
+            self.s.send(message)
             self.data = self.s.recv(1024)
             print self.data
 
@@ -43,9 +46,13 @@ class Client():
                 self.username = m.group(0)
                 self.data = re.sub("\[ACCEPT\|[a-zA-Z0-9_]+\]", "", self.data)
                 break
-            # Let's just print it.
 
-            time.sleep(1)
+            m = re.search("(?<=\[WAIT\|)[a-zA-Z0-9_]+", self.data)
+            if m:
+                self.username = m.group(0)
+                self.data = re.sub("\[WAIT\|[a-zA-Z0-9_]+\]", "", self.data)
+                break
+            # Let's just print it.
 
         # Get the player list. (I'll probably throw this away when I'm done with it.)
         m = re.search("(?<=\[PLAYERS\|)([a-zA-Z0-9]+\,?)+", self.data)
@@ -92,7 +99,6 @@ class Client():
             self.s.send("[PLAY|%s]" % cardToPlay)
         return
 
-
         while True:
             self.data = self.data + self.s.recv(1024)
             print self.data
@@ -107,7 +113,7 @@ class Client():
                 self.data = re.sub("\[INVALID\|[^\]]+\]", "", self.data)
                 cardToPlay, cardToRemove = chooseCard(topCard)
                 self.s.send("[PLAY|%s]" % cardToPlay)
-            time.sleep(1)
+            #time.sleep(1)
 
     # For playing a game.
     def playGame(self):
@@ -160,8 +166,9 @@ class Client():
         serverAddress = (self.hostname, self.port)
         self.s.connect(serverAddress)
         self.waitInLobby()
-        self.waitForGame()
-        self.playGame()
+        while True:
+            self.waitForGame()
+            self.playGame()
 
 if __name__ == "__main__":
     parser = OptionParser()

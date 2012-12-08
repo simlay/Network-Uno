@@ -71,9 +71,9 @@ cardList = [
                 ]
 
 class Server():
-    def __init__(self, port, time, minPlayers, maxPlayers, maxLobby):
+    def __init__(self, port, timeout, minPlayers, maxPlayers, maxLobby):
         self.port = port
-        self.lobbyTime = time
+        self.timeout = timeout
         self.minPlayers = minPlayers
         self.maxPlayers = maxPlayers
         self.maxLobby = maxLobby
@@ -140,6 +140,7 @@ class Server():
             return False
 
     def playGame(self):
+        print "PLAYING GAME"
         self.playerOrder = self.playerList.values()
         #time.sleep(1)
 
@@ -153,14 +154,23 @@ class Server():
         inputs = self.connectionDictionary.values() + [self.server]
         data_buffer = {}
 
+        already_played_NN = False
+
+        played = False
+
         while True:
+            if data != "":
+                print data
 
             playerName = self.playerOrder[playerIndex]
             connection = self.connectionDictionary[playerName]
 
+            #print "Player %s turn, top card %s" % (playerName, self.discardPile[-1])
             message = "[GO|%s]" % self.discardPile[-1]
+            print "%s -> %s" % (playerName, message)
+            #if not played:
             connection.send(message)
-            readable, writable, exceptional = select.select(inputs, [], [])
+            readable, writable, exceptional = select.select(inputs, [], [], 2)
             for s in readable:
                 # A new connection?
                 if s == self.server:
@@ -177,27 +187,17 @@ class Server():
                     else:
                         data_buffer[s] = new_data
 
-            #while True:
-            #    try:
-            #        # Let's try to get some data.
-            #        data = data + connection.recv(1024)
-            #        break
-            #    except:
-            #        None
-
-            if data != "":
-                print data
 
             m = re.search("(?<=\[PLAY\|)[A-Z0-9]+", data)
             if m:
                 card = m.group(0)
                 #print playerName, message, card, self.playerCards[playerName], self.discardPile
                 if self.validateCard(card):
-                    print "%s played %s" % (playerName, card)
+                    #print "%s played %s" % (playerName, card)
                     self.discardPile.append(card)
-                    playerIndex = (playerIndex + playDirection) % len(self.playerList)
 
                     message = "[PLAYED|%s,%s]" % (playerName, card)
+                    print message
 
                     self.broadcast(message)
                     if card != "NN":
@@ -208,14 +208,66 @@ class Server():
                         if removeCard in self.playerCards[playerName]:
                             self.playerCards[playerName].remove(removeCard)
                         else:
-                            connection.send("[INVALID|YOU DON'T HAVE %s!]" % card)
-                            connection.send("[GO|%s]" % self.discardPile[-1])
+                            None
+                            #connection.send("[INVALID|YOU DON'T HAVE %s!]" % card)
+                            #connection.send("[GO|%s]" % self.discardPile[-1])
 
                     if len(self.playerCards[playerName]) == 0:
                         self.broadcast("[GG|%s]" % playerName)
                         break
 
-                elif card == "NN":
+                    # Implement the game rules!
+                    # SKIP
+                    if card[1] == "S":
+                        print "SKIP INDEX BEFORE: %s AFTER: %s" % (playerIndex, (playerIndex + 2*playDirection) % len(self.playerOrder))
+                        playerIndex = (playerIndex + 2*playDirection) % len(self.playerOrder)
+
+                    # REVERSE
+                    elif card[1] == "U":
+                        print "REVERSE BEFORE %s AFTER %s" %(playerIndex, (playerIndex - playDirection) % len(self.playerOrder))
+                        playDirection = -playDirection
+                        playerIndex = (playerIndex + playDirection) % len(self.playerOrder)
+                        print "PLAYER INDEX:", playerIndex
+
+                    # DRAW 2
+                    elif card[1] == "D":
+                        print "DRAW 2 BEFORE %s AFTER %s" % (playerIndex, (playerIndex + playDirection) % len(self.playerOrder))
+                        playerIndex = (playerIndex + playDirection) % len(self.playerOrder)
+                        cards = []
+                        for i in xrange(2):
+                            newCard = choice(self.cardStack)
+                            cards.append(newCard)
+                            self.cardStack.remove(newCard)
+
+                        message = "[DEAL|%s,%s]" % (cards[0], cards[1])
+                        send_to_player = self.playerOrder[playerIndex]
+
+                        print "%s -> %s" % (send_to_player, message)
+
+                        self.connectionDictionary[send_to_player].send(message)
+
+                    # Wild Draw 4
+                    elif card[1] == "F":
+                        print "WILD DRAW 4 BEFORE %s AFTER %s" % (playerIndex, (playerIndex + playDirection) % len(self.playerOrder))
+                        playerIndex = (playerIndex + playDirection) % len(self.playerOrder)
+                        newCards = []
+                        for i in xrange(4):
+                            newCard = choice(self.cardStack)
+                            newCards.append(newCard)
+                            self.cardStack.remove(newCard)
+
+                        send_to_player = self.playerOrder[playerIndex]
+                        message = "[DEAL|%s,%s,%s,%s]" % (newCards[0], newCards[1], newCards[2], newCards[3])
+
+                        print "%s -> %s" % (send_to_player, message)
+
+                        self.connectionDictionary[send_to_player].send(message)
+
+                    else:
+                        playerIndex = (playerIndex + playDirection) % len(self.playerList)
+                    played = False
+
+                elif card == "NN" and not already_played_NN:
                     if len(self.cardStack) == 0:
                         self.broadcast("[GG|%s]" % socket.gethostname())
                         return
@@ -225,10 +277,19 @@ class Server():
                     self.playerCards[playerName].append(newCard)
 
                     message = "[DEAL|%s]" % newCard
+                    print "%s -> %s" % (playerName, message)
                     connection.send(message)
 
-                    message = "[GO|%s]" % self.discardPile[-1]
-                    connection.send(message)
+                    #message = "[GO|%s]" % self.discardPile[-1]
+                    #connection.send(message)
+                    already_played_NN = True
+                    #played = False
+
+                # Still doesn't have a card to play.
+                elif card == "NN" and already_played_NN:
+                    playerIndex = (playerIndex + playDirection) % len(self.playerOrder)
+                    already_played_NN = False
+                    #played = True
                 else:
                     message = "[INVALID|CARD NOT VALID]"
                     connection.send(message)
@@ -240,7 +301,7 @@ class Server():
                 self.broadcast("[UNO|%s]" % playerName)
 
 
-            playerIndex = (playerIndex + 1) % len(self.playerOrder)
+            #playerIndex = (playerIndex + 1) % len(self.playerOrder)
             #time.sleep(1)
 
     def startGame(self):
@@ -271,10 +332,10 @@ class Server():
 
         self.data_buffer = {}
 
-        while int(time.time()) - countDownTime < self.lobbyTime or len(self.playerList) < self.minPlayers:
+        while int(time.time()) - countDownTime < 5 or len(self.playerList) < self.minPlayers:
 
             if len(self.playerList) >= self.minPlayers:
-                sys.stderr.write("\rStarting in %s" % (self.lobbyTime - (int(time.time()) - countDownTime)))
+                sys.stderr.write("\rStarting in %s" % (5 - (int(time.time()) - countDownTime)))
 
             readable, writable, exceptional = select.select(inputs, outputs, inputs)
             for s in readable:

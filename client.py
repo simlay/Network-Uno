@@ -79,7 +79,7 @@ class Client():
 
 
         cardToPlay, cardToRemove = chooseCard(topCard)
-        print "Playing card", cardToPlay
+        print "Playing card %s given %s" % (cardToPlay, topCard)
         self.s.send("[PLAY|%s]" % cardToPlay)
         if cardToRemove != "NN":
             self.myCards.remove(cardToRemove)
@@ -119,14 +119,15 @@ class Client():
 
         while True:
             self.data = self.data + self.s.recv(1024)
-            if self.data != "":
-                print self.data
+            #if self.data != "":
+            #    print self.data
 
             # HAVE I BEEN DEALT?
             m = re.search("(?<=\[DEAL\|)([A-Z0-9]+\,?)+", self.data)
             if m:
-                self.myCards = self.myCards + m.group(0).split(",")
-                print "MY CARDS ARE %s" % self.myCards
+                newCards = m.group(0).split(",")
+                self.myCards = self.myCards + newCards
+                print "MY CARDS ARE %s, newCards are %s" % (self.myCards, newCards)
                 self.data = re.sub("\[DEAL\|([A-Z0-9]+\,?)+\]", "", self.data)
 
             # Did someone play a card?
@@ -136,7 +137,8 @@ class Client():
                 if playerName == self.username and cardToRemove != "NN":
                     if cardToRemove[1] == "F" or cardToRemove[1] == "W":
                         cardToRemove = "N" + cardToRemove[1]
-                    #self.myCards.remove(cardToRemove)
+
+                print "%s played card %s" % (playerName, cardToRemove)
                 self.data = re.sub("\[PLAYED\|[a-zA-Z0-9]+,[A-Z0-9]+\]", "", self.data)
 
             # IS IT A TURN?
@@ -145,7 +147,6 @@ class Client():
                 topCard = m.group(0)
                 self.data = re.sub("\[GO\|[A-Z0-9]+\]", "", self.data)
                 #print "MY TURN!!!!", topCard, self.data
-
                 self.makeTurn(topCard)
 
             # GOOD GAME?
@@ -154,11 +155,11 @@ class Client():
                 self.data = re.sub("\[GG\|[a-zA-Z0-9_]+\]", "", self.data)
                 break
 
-
             # Have I made an invalid command?
             m = re.search("(?<=\[INVALID\|)[^\]]+", self.data)
             if m:
                 self.data = re.sub("\[INVALID\|[^\]]+\]", "", self.data)
+            time.sleep(1)
 
     def run(self):
         serverAddress = (self.hostname, self.port)

@@ -20,10 +20,10 @@ class Client():
         print "CLIENT WAITING FOR GAME TO START!"
         while True:
             print self.data
-            m = re.search("(?<=\[STARTGAME\|)([a-zA-Z0-9]+\,?)*", self.data)
+            m = re.search("(?<=\[STARTGAME\|)([a-zA-Z0-9_]+\,?)*", self.data)
             if m:
                 self.playerList = m.group(0).split(",")
-                self.data = re.sub("\[STARTGAME\|([a-zA-Z0-9]+\,?)*\]", "", self.data)
+                self.data = re.sub("\[STARTGAME\|([a-zA-Z0-9_]+\,?)*\]", "", self.data)
                 print "STARTING A GAME WITH %s" % self.playerList
                 break
             self.data = self.data + self.s.recv(1024)
@@ -57,7 +57,7 @@ class Client():
         m = re.search("(?<=\[PLAYERS\|)([a-zA-Z0-9]+\,?)+", self.data)
         if m:
             self.playerList = m.group(0).split(",")
-            self.data = re.sub("\[PLAYERS\|([a-zA-Z0-9]+\,?)+\]", "", self.data)
+            self.data = re.sub("\[PLAYERS\|([a-zA-Z0-9_]+\,?)+\]", "", self.data)
             print self.playerList
         print "CLIENT EXITING THE LOBBY!"
 

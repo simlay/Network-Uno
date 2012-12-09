@@ -99,7 +99,7 @@ class Server():
 
     def sendPlayerList(self):
         message = "[PLAYERS|"
-        for playerName in self.playerList.values():
+        for playerName in self.lobby_clients.values():
             message = message + playerName + ","
         message = message[:-1] + "]"
         self.broadcast(message)
@@ -166,227 +166,239 @@ class Server():
         already_played_NN = False
 
         #played = False
-        self.lobby_clients = {}
 
         while len(self.playerList) > 1:
+            playerIndex = playerIndex % len(self.playerOrder)
+            #if data != "":
+            #    print data
+
+            playerName = self.playerOrder[playerIndex]
+            connection = self.connectionDictionary[playerName]
+
+            #print "TURN:", playerIndex, playerName
+
+            #print "Player %s turn, top card %s" % (playerName, self.discardPile[-1])
+            message = "[GO|%s]" % self.discardPile[-1]
+            print "%s -> %s" % (playerName, message)
             try:
-                playerIndex = playerIndex % len(self.playerOrder)
-                if data != "":
-                    print data
-
-                playerName = self.playerOrder[playerIndex]
-                connection = self.connectionDictionary[playerName]
-
-                #print "TURN:", playerIndex, playerName
-
-                #print "Player %s turn, top card %s" % (playerName, self.discardPile[-1])
-                message = "[GO|%s]" % self.discardPile[-1]
-                print "%s -> %s" % (playerName, message)
-                try:
-                    connection.send(message)
-                except:
-                    if connection in self.playerList:
-                        print "SENDING GO FAILD: Connection %s probably closed" % (self.playerList[connection])
-                    else:
-                        print "Connection %s probably closed" % connection
-
-                readable, writable, exceptional = select.select(inputs, [], [])
-                for s in readable:
-                    # A new connection?
-                    if s == self.server:
-                        client, address = self.server.accept()
-                        inputs.append(client)
-                        print "NEW CONNECTION FROM",  address
-                    else:
-                        try:
-                            new_data = s.recv(1024)
-                        except:
-                            new_data = None
-                        # Readable data.
-                        if new_data:
-                            data = data + new_data
-                            if s in data_buffer:
-                                data_buffer[s] = data_buffer[s] + new_data
-                            else:
-                                data_buffer[s] = new_data
-
-                            print s, self.playerList, self.lobby_clients
-                            if s not in self.playerList and s not in self.lobby_clients:
-                                m = re.search("(?<=\[JOIN\|)[a-zA-Z0-9_]+", new_data)
-                                print new_data
-                                if m:
-                                    newPlayerName = m.group(0)
-                                    if newPlayerName in self.playerList.values():
-                                        newPlayerName = newPlayerName + str(self.nameCount)
-                                        self.nameCount += 1
-                                        print "Player %s was added to lobby!" % newPlayerName
-                                        message = "[WAIT|%s]" % newPlayerName
-                                        s.send(message)
-                                        self.lobby_clients[s] = newPlayerName
-
-                                m = re.search("(?<=\[CHAT\|)[a-zA-Z0-9_]+", data)
-                                if m:
-                                    None
-                                    #chatMessage = m.group(0)
-                                    #message = "[CHAT
-                                    #self.broadcast(
-
-
-
-                        # Connection has closed.
-                        else:
-                            inputs.remove(s)
-                            if s in self.playerList:
-                                print "CONNECTION %s DROPPED" % (self.playerList[s])
-                            else:
-                                print "CONNECTION %s DROPPED" % s
-
-                            if s in self.playerList:
-                                playerName = self.playerList[s]
-                                del self.playerList[s]
-                                del self.connectionDictionary[playerName]
-                                self.playerOrder.remove(playerName)
-                                if s in inputs:
-                                    inputs.remove(s)
-                                message = "[PLAYERS|"
-                                for i in self.playerOrder:
-                                    message = message + i + ","
-                                message = message[:-1] + "]"
-                                print "BROADCAST: %s" % message
-                                self.broadcast(message)
-                if connection in data_buffer:
-                    m = re.search("(?<=\[PLAY\|)[A-Z0-9]+", data_buffer[connection])
-                else:
-                    m = None
-                if m:
-                    card = m.group(0)
-                    #print playerName, message, card, self.playerCards[playerName], self.discardPile
-                    if self.validateCard(card):
-                        #print "%s played %s" % (playerName, card)
-                        self.discardPile.append(card)
-
-                        message = "[PLAYED|%s,%s]" % (playerName, card)
-                        print message
-
-                        self.broadcast(message)
-                        if card != "NN":
-                            removeCard = card
-                            if card[1] == "F" or card[1] == "W":
-                                removeCard = "N" + card[1]
-
-                            if removeCard in self.playerCards[playerName]:
-                                self.playerCards[playerName].remove(removeCard)
-                            else:
-                                None
-                                #connection.send("[INVALID|YOU DON'T HAVE %s!]" % card)
-                                #connection.send("[GO|%s]" % self.discardPile[-1])
-
-                        if len(self.playerCards[playerName]) == 0:
-                            self.broadcast("[GG|%s]" % playerName)
-                            break
-
-                        # Implement the game rules!
-                        # SKIP
-                        if card[1] == "S":
-                            print "SKIP INDEX BEFORE: %s AFTER: %s" % (playerIndex, (playerIndex + 2*playDirection) % len(self.playerOrder))
-                            playerIndex = (playerIndex + 2*playDirection) % len(self.playerOrder)
-
-                        # REVERSE
-                        elif card[1] == "U":
-                            print "REVERSE BEFORE %s AFTER %s" %(playerIndex, (playerIndex - playDirection) % len(self.playerOrder))
-                            playDirection = -playDirection
-                            playerIndex = (playerIndex + playDirection) % len(self.playerOrder)
-                            print "PLAYER INDEX:", playerIndex
-
-                        # DRAW 2
-                        elif card[1] == "D":
-                            print "DRAW 2 BEFORE %s AFTER %s" % (playerIndex, (playerIndex + playDirection) % len(self.playerOrder))
-                            playerIndex = (playerIndex + playDirection) % len(self.playerOrder)
-                            cards = []
-                            for i in xrange(2):
-                                newCard = choice(self.cardStack)
-                                cards.append(newCard)
-                                self.cardStack.remove(newCard)
-
-                            message = "[DEAL|%s,%s]" % (cards[0], cards[1])
-                            send_to_player = self.playerOrder[playerIndex]
-
-                            print "%s -> %s" % (send_to_player, message)
-
-                            try:
-                                self.connectionDictionary[send_to_player].send(message)
-                            except:
-                                print "Connection probably closed"
-
-                        # Wild Draw 4
-                        elif card[1] == "F":
-                            print "WILD DRAW 4 BEFORE %s AFTER %s" % (playerIndex, (playerIndex + playDirection) % len(self.playerOrder))
-                            playerIndex = (playerIndex + playDirection) % len(self.playerOrder)
-                            newCards = []
-                            for i in xrange(4):
-                                newCard = choice(self.cardStack)
-                                newCards.append(newCard)
-                                self.cardStack.remove(newCard)
-
-                            send_to_player = self.playerOrder[playerIndex]
-                            message = "[DEAL|%s,%s,%s,%s]" % (newCards[0], newCards[1], newCards[2], newCards[3])
-
-                            print "%s -> %s" % (send_to_player, message)
-                            try:
-                                self.connectionDictionary[send_to_player].send(message)
-                            except:
-                                print "Connection probably closed."
-
-                        else:
-                            playerIndex = (playerIndex + playDirection) % len(self.playerList)
-                        #played = False
-                        already_played_NN = False
-
-                    elif card == "NN" and not already_played_NN:
-                        if len(self.cardStack) == 0:
-                            self.broadcast("[GG|%s]" % socket.gethostname())
-                            return
-
-                        newCard = choice(self.cardStack)
-                        self.cardStack.remove(newCard)
-                        self.playerCards[playerName].append(newCard)
-
-                        message = "[DEAL|%s]" % newCard
-                        print "%s -> %s" % (playerName, message)
-                        try:
-                            connection.send(message)
-                        except:
-                            if connection in self.playerList:
-                                print "Connection %s, %s probably closed" % (connection, self.playerList[connection])
-                            else:
-                                print "Connection %s probably closed" % connection
-
-                        already_played_NN = True
-                        #played = False
-
-                    # Still doesn't have a card to play.
-                    elif card == "NN" and already_played_NN:
-                        playerIndex = (playerIndex + playDirection) % len(self.playerOrder)
-                        already_played_NN = False
-                        #played = True
-                    else:
-                        message = "[INVALID|CARD NOT VALID]"
-                        try:
-                            connection.send(message)
-                        except:
-                            if connection in self.playerList:
-                                print "Connection %s, %s probably closed" % (connection, self.playerList[connection])
-                            else:
-                                print "Connection %s probably closed" % connection
-
-                    data_buffer[connection] = re.sub("\[PLAY\|[A-Z0-9]+\]", "", data_buffer[connection])
-
-                    #print self.discardPile, playerIndex
-                if len(self.playerCards[playerName]) == 1:
-                    self.broadcast("[UNO|%s]" % playerName)
+                connection.send(message)
             except:
+                if connection in self.playerList:
+                    print "SENDING GO FAILD: Connection %s probably closed" % (self.playerList[connection])
+                else:
+                    print "Connection %s probably closed" % connection
+
+            readable, writable, exceptional = select.select(inputs, [], [])
+            print readable, writable, exceptional
+            for s in readable:
+                # A new connection?
+                if s == self.server:
+                    client, address = self.server.accept()
+                    inputs.append(client)
+                    print "NEW CONNECTION FROM",  address, client
+                else:
+                    try:
+                        new_data = s.recv(1024)
+                    except:
+                        new_data = None
+                    # Readable data.
+                    if new_data:
+                        data = data + new_data
+                        if s in data_buffer:
+                            data_buffer[s] = data_buffer[s] + new_data
+                        else:
+                            data_buffer[s] = new_data
+
+                        if s not in self.playerList and s not in self.lobby_clients:
+                            m = re.search("(?<=\[JOIN\|)[a-zA-Z0-9_]+", new_data)
+                            #print new_data
+                            if m:
+                                newPlayerName = m.group(0)
+                                if newPlayerName in self.playerList.values():
+                                    newPlayerName = newPlayerName + str(self.nameCount)
+                                    self.nameCount += 1
+                                print "Player %s was added to lobby!" % newPlayerName
+                                message = "[WAIT|%s]" % newPlayerName
+                                s.send(message)
+                                self.lobby_clients[s] = newPlayerName
+
+                            m = re.search("(?<=\[CHAT\|)[a-zA-Z0-9_]+", data)
+                            if m:
+                                None
+                                #chatMessage = m.group(0)
+                                #message = "[CHAT
+                                #self.broadcast(
+
+
+
+                    # Connection has closed.
+                    else:
+                        inputs.remove(s)
+                        if s in self.playerList:
+                            print "CONNECTION %s DROPPED" % (self.playerList[s])
+                        else:
+                            print "CONNECTION %s DROPPED" % s
+
+                        if s in self.playerList:
+                            playerName = self.playerList[s]
+                            del self.playerList[s]
+                            if playerName in self.connectionDictionary:
+                                del self.connectionDictionary[playerName]
+
+                            if playerName in self.playerOrder:
+                                self.playerOrder.remove(playerName)
+
+                            if s in inputs:
+                                inputs.remove(s)
+                            message = "[PLAYERS|"
+                            for i in self.playerOrder:
+                                message = message + i + ","
+                            message = message[:-1] + "]"
+                            print "BROADCAST: %s" % message
+                            self.broadcast(message)
+
+                        if s in self.lobby_clients:
+                            del self.lobby_clients[s]
+
+
+            try:
+                m = re.search("(?<=\[PLAY\|)[A-Z0-9]+", data_buffer[connection])
+            except:
+                m = None
                 None
 
+            if m:
+                card = m.group(0)
+                #print playerName, message, card, self.playerCards[playerName], self.discardPile
+                if self.validateCard(card):
+                    #print "%s played %s" % (playerName, card)
+                    self.discardPile.append(card)
+
+                    message = "[PLAYED|%s,%s]" % (playerName, card)
+                    print message
+
+                    self.broadcast(message)
+                    if card != "NN":
+                        removeCard = card
+                        if card[1] == "F" or card[1] == "W":
+                            removeCard = "N" + card[1]
+
+                        if removeCard in self.playerCards[playerName]:
+                            self.playerCards[playerName].remove(removeCard)
+                        else:
+                            None
+                            #connection.send("[INVALID|YOU DON'T HAVE %s!]" % card)
+                            #connection.send("[GO|%s]" % self.discardPile[-1])
+
+                    if len(self.playerCards[playerName]) == 0:
+                        self.broadcast("[GG|%s]" % playerName)
+                        break
+
+                    # Implement the game rules!
+                    # SKIP
+                    if card[1] == "S":
+                        #print "SKIP INDEX BEFORE: %s AFTER: %s" % (playerIndex, (playerIndex + 2*playDirection) % len(self.playerOrder))
+                        playerIndex = (playerIndex + 2*playDirection) % len(self.playerOrder)
+
+                    # REVERSE
+                    elif card[1] == "U":
+                        #print "REVERSE BEFORE %s AFTER %s" %(playerIndex, (playerIndex - playDirection) % len(self.playerOrder))
+                        playDirection = -playDirection
+                        playerIndex = (playerIndex + playDirection) % len(self.playerOrder)
+                        #print "PLAYER INDEX:", playerIndex
+
+                    # DRAW 2
+                    elif card[1] == "D":
+                        #print "DRAW 2 BEFORE %s AFTER %s" % (playerIndex, (playerIndex + playDirection) % len(self.playerOrder))
+                        playerIndex = (playerIndex + playDirection) % len(self.playerOrder)
+                        cards = []
+                        for i in xrange(2):
+                            newCard = choice(self.cardStack)
+                            cards.append(newCard)
+                            self.cardStack.remove(newCard)
+
+                        message = "[DEAL|%s,%s]" % (cards[0], cards[1])
+                        send_to_player = self.playerOrder[playerIndex]
+
+                        print "%s -> %s" % (send_to_player, message)
+
+                        try:
+                            self.connectionDictionary[send_to_player].send(message)
+                        except:
+                            print "Connection probably closed"
+
+                    # Wild Draw 4
+                    elif card[1] == "F":
+                        #print "WILD DRAW 4 BEFORE %s AFTER %s" % (playerIndex, (playerIndex + playDirection) % len(self.playerOrder))
+                        playerIndex = (playerIndex + playDirection) % len(self.playerOrder)
+                        newCards = []
+                        for i in xrange(4):
+                            newCard = choice(self.cardStack)
+                            newCards.append(newCard)
+                            self.cardStack.remove(newCard)
+
+                        send_to_player = self.playerOrder[playerIndex]
+                        message = "[DEAL|%s,%s,%s,%s]" % (newCards[0], newCards[1], newCards[2], newCards[3])
+
+                        print "%s -> %s" % (send_to_player, message)
+                        try:
+                            self.connectionDictionary[send_to_player].send(message)
+                        except:
+                            print "Connection probably closed."
+
+                    else:
+                        playerIndex = (playerIndex + playDirection) % len(self.playerList)
+                    #played = False
+                    already_played_NN = False
+
+                elif card == "NN" and not already_played_NN:
+                    if len(self.cardStack) == 0:
+                        self.broadcast("[GG|%s]" % socket.gethostname())
+                        return
+
+                    newCard = choice(self.cardStack)
+                    self.cardStack.remove(newCard)
+                    self.playerCards[playerName].append(newCard)
+
+                    message = "[DEAL|%s]" % newCard
+                    print "%s -> %s" % (playerName, message)
+                    try:
+                        connection.send(message)
+                    except:
+                        if connection in self.playerList:
+                            print "Connection %s, %s probably closed" % (connection, self.playerList[connection])
+                        else:
+                            print "Connection %s probably closed" % connection
+
+                    already_played_NN = True
+                    #played = False
+
+                # Still doesn't have a card to play.
+                elif card == "NN" and already_played_NN:
+                    playerIndex = (playerIndex + playDirection) % len(self.playerOrder)
+                    already_played_NN = False
+                    #played = True
+                else:
+                    message = "[INVALID|CARD NOT VALID]"
+                    try:
+                        connection.send(message)
+                    except:
+                        if connection in self.playerList:
+                            print "Connection %s, %s probably closed" % (connection, self.playerList[connection])
+                        else:
+                            print "Connection %s probably closed" % connection
+
+                try:
+
+                    data_buffer[connection] = re.sub("\[PLAY\|[A-Z0-9]+\]", "", data_buffer[connection])
+                except:
+                    None
+
+                #print self.discardPile, playerIndex
+            if len(self.playerCards[playerName]) == 1:
+                self.broadcast("[UNO|%s]" % playerName)
+
+        self.playerList = self.lobby_clients
 
             #playerIndex = (playerIndex + 1) % len(self.playerOrder)
             #time.sleep(1)
@@ -407,21 +419,23 @@ class Server():
         #socket.setdefaulttimeout(0)
 
         inputs = [ server ]
-        self.playerList = {}
         outputs = [ ]
 
         # For unique names.
         self.nameCount = 0
 
         # For the countDown.
-        countDownTime = int(time.time())
+        #countDownTime = int(time.time())
+        countDownTime = 0
         data = ""
 
         self.data_buffer = {}
 
-        while int(time.time()) - countDownTime < 5 or len(self.playerList) < self.minPlayers:
+        print "LOBBY CLIENTS:", self.lobby_clients
 
-            if len(self.playerList) >= self.minPlayers:
+        while (time != 0 and int(time.time()) - countDownTime < 5) or len(self.lobby_clients) < self.minPlayers:
+
+            if len(self.lobby_clients) >= self.minPlayers:
                 sys.stderr.write("\rStarting in %s" % (5 - (int(time.time()) - countDownTime)))
 
             readable, writable, exceptional = select.select(inputs, outputs, inputs)
@@ -449,12 +463,12 @@ class Server():
                             playerName = m.group(0)
 
                             # Game sure it's a unique name.
-                            if playerName in self.playerList.values():
+                            if playerName in self.lobby_clients.values():
                                 playerName = playerName + str(self.nameCount)
                                 self.nameCount += 1
 
-                            if s not in self.playerList:
-                                self.playerList[s] = playerName
+                            if s not in self.lobby_clients:
+                                self.lobby_clients[s] = playerName
                                 print "Player %s was added!" % playerName
                                 message = "[ACCEPT|%s]" % playerName
                                 #print "sending message {%s}" % message
@@ -462,11 +476,13 @@ class Server():
                                 s.send(message)
 
                                 # Send the player list just as exiting the lobby.
+                                self.playerList = self.lobby_clients
                                 self.sendPlayerList()
 
                                 # Start off the counter!
-                                if len(self.playerList) >= self.minPlayers:
-                                    countDownTime = int(time.time())
+                                if len(self.lobby_clients) >= self.minPlayers:
+                                    if countDownTime == 0:
+                                        countDownTime = int(time.time())
                                     print "STARTING THE TIMER!"
 
                         else:
@@ -480,16 +496,18 @@ class Server():
                         if s in outputs:
                             outputs.remove(s)
                             inputs.remove(s)
-                            self.playerList.pop(s)
+                            self.lobby_clients.pop(s)
                             s.close()
                         print "REMOVING PLAYER"
-                        del self.playerList[s]
+                        del self.lobby_clients[s]
                         s.close()
         sys.stderr.write("\r")
+        self.playerList = self.lobby_clients
 
     def run(self):
-        self.lobby()
+        self.lobby_clients = {}
         while True:
+            self.lobby()
             self.startGame()
 
 

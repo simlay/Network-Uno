@@ -1,0 +1,35 @@
+Card Name | suffix | prefix   | amount      | Example
+__________|________| (one of) |_____________|_________
+Numbers   |  0-9   |   RGBY   | 1 0, 2 1-9  | R3 = Red 3
+Draw Two  |   D    |   RGBY   |  2 of each  | BD = Blue Draw 2
+Skip      |   S    |   RGBY   |    " "      | YS = Yellow Skip
+Reverse   |   R    |   RGBY   |    " "      | GR = Green Reverse
+Wild      |   W    |  N,RGBY  |     4       | NW, GW = No Color Wild, Green Wild
+Draw 4 W  |   F    |  N,RGBY  |     4       | NF, BF = No Color Wild (4), Blue Wild (4)
+
+NN represents no play
+
+Commands/Messages:
+
+**A COMMAND WILL BE IN ALL CAPS**
+
+--ALL EXAMPLES WITH (CV) ARE REFERING TO CARD VALUE--
+
+FORMAT:
+-------
+
+[OP/CMD|  ,  ,  ,  ,  ]
+
+[CHAT|SENDERNAME,MSG]	C
+[JOIN|NAME]				C
+[DEAL|RS,BD,NW,..,Y0]	S
+[UNO|NAME]				S (BROADCAST)
+[PLAY|CV]				C
+[PLAYED|NAME,CV]		S (BROADCAST)
+[GO|CV]					S --CV IS TOP CARD ON THE DECK
+[INVALID|MSG]			S --MSG INDICATES THE ISSUE
+[PLAYERS|P1,P2,P3...]	S
+[ACCEPT|RETURNNAME]		S
+[GG|NAME]				S --NAME IS WINNER OF THE ROUND
+[WAIT|NAME]				S --TELLS A PLAYER JOINING THAT A SESSION HAS BEEN STARTED WITHOUT THEM.
+							THEY CAN "SPECTATE" (RECEIVING ALL BROADCAST MESSAGES)

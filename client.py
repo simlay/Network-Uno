@@ -100,9 +100,9 @@ class Client():
         while True:
             self.data = self.data + self.s.recv(1024)
             print self.data
-            m = re.search("(?<=\[PLAYED\|)[a-zA-Z0-9]+,[A-Z0-9]+", self.data)
+            m = re.search("(?<=\[PLAYED\|)[a-zA-Z0-9_]+,[A-Z0-9]+", self.data)
             if m:
-                self.data = re.sub("\[PLAYED\|[a-zA-Z0-9]+,[A-Z0-9]+\]", "", self.data)
+                self.data = re.sub("\[PLAYED\|[a-zA-Z0-9_]+,[A-Z0-9]+\]", "", self.data)
                 if cardToRemove != "NN":
                     self.myCards.remove(cardToRemove)
                 return
@@ -118,9 +118,16 @@ class Client():
         self.myCards = []
 
         while True:
-            self.data = self.data + self.s.recv(1024)
-            #if self.data != "":
-            #    print self.data
+
+            # GOOD GAME?
+            m = re.search("(?<=\[GG\|)[a-zA-Z0-9_]+", self.data)
+            if m:
+                self.data = re.sub("\[GG\|[a-zA-Z0-9_]+\]", "", self.data)
+                print "PLAYER %s WON!" % m.group(0)
+                break
+
+            if self.data != "":
+                print self.data
 
             # HAVE I BEEN DEALT?
             m = re.search("(?<=\[DEAL\|)([A-Z0-9]+\,?)+", self.data)
@@ -131,15 +138,16 @@ class Client():
                 self.data = re.sub("\[DEAL\|([A-Z0-9]+\,?)+\]", "", self.data)
 
             # Did someone play a card?
-            m = re.search("(?<=\[PLAYED\|)[a-zA-Z0-9]+,[A-Z0-9]+", self.data)
-            if m:
+            m = re.search("(?<=\[PLAYED\|)[a-zA-Z0-9_]+,[A-Z0-9]+", self.data)
+            while m:
                 playerName, cardToRemove = m.group(0).split(",")
                 if playerName == self.username and cardToRemove != "NN":
                     if cardToRemove[1] == "F" or cardToRemove[1] == "W":
                         cardToRemove = "N" + cardToRemove[1]
 
                 print "%s played card %s" % (playerName, cardToRemove)
-                self.data = re.sub("\[PLAYED\|[a-zA-Z0-9]+,[A-Z0-9]+\]", "", self.data)
+                self.data = re.sub("\[PLAYED\|[a-zA-Z0-9_]+,[A-Z0-9]+\]", "", self.data)
+                m = re.search("(?<=\[PLAYED\|)[a-zA-Z0-9_]+,[A-Z0-9]+", self.data)
 
             # IS IT A TURN?
             m = re.search("(?<=\[GO\|)[A-Z0-9]+", self.data)
@@ -149,16 +157,20 @@ class Client():
                 #print "MY TURN!!!!", topCard, self.data
                 self.makeTurn(topCard)
 
-            # GOOD GAME?
-            m = re.search("(?<=\[GG\|)[a-zA-Z0-9_]+", self.data)
+            # UNO?
+            m = re.search("(?<=\[UNO\|)[a-zA-Z0-9_]+", self.data)
             if m:
-                self.data = re.sub("\[GG\|[a-zA-Z0-9_]+\]", "", self.data)
-                break
+                winner = m.group(0)
+                print "WINNER %s" % winner
+                self.data = re.sub("\[UNO\|[a-zA-Z0-9_]+\]", "", self.data)
+
 
             # Have I made an invalid command?
             m = re.search("(?<=\[INVALID\|)[^\]]+", self.data)
             if m:
                 self.data = re.sub("\[INVALID\|[^\]]+\]", "", self.data)
+
+            self.data = self.data + self.s.recv(1024)
             time.sleep(1)
 
     def run(self):
@@ -168,6 +180,7 @@ class Client():
         while True:
             self.waitForGame()
             self.playGame()
+            #self.data = ""
 
 if __name__ == "__main__":
     #parser = OptionParser()

@@ -88,6 +88,7 @@ class Server():
         sys.stderr.write("Starting up server on %s with port %s\n" % serverAddress)
 
     def broadcast(self, message):
+        print "BROADCAST: %s" % message
         for connection in self.playerList:
             try:
                 connection.send(message)
@@ -189,7 +190,7 @@ class Server():
                     print "Connection %s probably closed" % connection
 
             readable, writable, exceptional = select.select(inputs, [], [])
-            print readable, writable, exceptional
+            #print readable, writable, exceptional
             for s in readable:
                 # A new connection?
                 if s == self.server:
@@ -238,6 +239,8 @@ class Server():
                             print "CONNECTION %s DROPPED" % (self.playerList[s])
                         else:
                             print "CONNECTION %s DROPPED" % s
+                        if s in self.lobby_clients:
+                            del self.lobby_clients[s]
 
                         if s in self.playerList:
                             playerName = self.playerList[s]
@@ -397,6 +400,10 @@ class Server():
                 #print self.discardPile, playerIndex
             if len(self.playerCards[playerName]) == 1:
                 self.broadcast("[UNO|%s]" % playerName)
+
+        if len(self.playerList) == 1:
+            print self.playerList
+            self.broadcast("[GG|%s]" % self.playerList.values()[0])
 
         self.playerList = self.lobby_clients
 

@@ -167,6 +167,7 @@ class Server():
         already_played_NN = False
 
         #played = False
+        lastIndex = -123
 
         while len(self.playerList) > 1:
             playerIndex = playerIndex % len(self.playerOrder)
@@ -182,15 +183,18 @@ class Server():
             message = "[GO|%s]" % self.discardPile[-1]
             print "%s -> %s" % (playerName, message)
             try:
-                connection.send(message)
+                if lastIndex != playerIndex:
+                    connection.send(message)
+                    lastIndex = playerIndex
             except:
                 if connection in self.playerList:
                     print "SENDING GO FAILD: Connection %s probably closed" % (self.playerList[connection])
+                    playerIndex = (playerIndex + playDirection) % len(self.playerList)
                 else:
-                    print "Connection %s probably closed" % connection
+                    playerIndex = (playerIndex + playDirection) % len(self.playerList)
+                    print "Connection %s probably closed, players %s remain" % (connection, self.playerOrder)
 
-            readable, writable, exceptional = select.select(inputs, [], [])
-            #print readable, writable, exceptional
+            readable, writable, exceptional = select.select(inputs, [], [], 1)
             for s in readable:
                 # A new connection?
                 if s == self.server:
@@ -223,28 +227,25 @@ class Server():
                                 s.send(message)
                                 self.lobby_clients[s] = newPlayerName
 
-                            m = re.search("(?<=\[CHAT\|)[a-zA-Z0-9_]+", data)
+                            m = re.search("(?<=\[CHAT\|)[[^\]]+", data)
                             if m:
-                                None
-                                #chatMessage = m.group(0)
-                                #message = "[CHAT
-                                #self.broadcast(
-
-
+                                chatMessage = m.group(0)
+                                message = "[CHAT|%s]" % chatMessage
+                                self.broadcast(message)
 
                     # Connection has closed.
                     else:
                         inputs.remove(s)
-                        if s in self.playerList:
-                            print "CONNECTION %s DROPPED" % (self.playerList[s])
-                        else:
-                            print "CONNECTION %s DROPPED" % s
+
                         if s in self.lobby_clients:
                             del self.lobby_clients[s]
 
                         if s in self.playerList:
+                            print "CONNECTION %s DROPPED" % (self.playerList[s])
                             playerName = self.playerList[s]
+
                             del self.playerList[s]
+
                             if playerName in self.connectionDictionary:
                                 del self.connectionDictionary[playerName]
 
@@ -253,12 +254,16 @@ class Server():
 
                             if s in inputs:
                                 inputs.remove(s)
+
                             message = "[PLAYERS|"
                             for i in self.playerOrder:
                                 message = message + i + ","
                             message = message[:-1] + "]"
                             print "BROADCAST: %s" % message
                             self.broadcast(message)
+
+                        else:
+                            print "CONNECTION %s DROPPED" % s
 
                         if s in self.lobby_clients:
                             del self.lobby_clients[s]
@@ -326,8 +331,10 @@ class Server():
                         print "%s -> %s" % (send_to_player, message)
 
                         try:
+                            playerIndex = (playerIndex + playDirection) % len(self.playerList)
                             self.connectionDictionary[send_to_player].send(message)
                         except:
+                            playerIndex = (playerIndex + playDirection) % len(self.playerList)
                             print "Connection probably closed"
 
                     # Wild Draw 4
@@ -370,6 +377,7 @@ class Server():
                     except:
                         if connection in self.playerList:
                             print "Connection %s, %s probably closed" % (connection, self.playerList[connection])
+                            del self.playerList[connection]
                         else:
                             print "Connection %s probably closed" % connection
 

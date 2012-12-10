@@ -1,7 +1,8 @@
 #!/usr/bin/python
 
 import socket
-#import sys
+import select
+import sys
 from optparse import OptionParser
 import time
 import re
@@ -17,19 +18,20 @@ class Client():
 
 
     def waitForGame(self):
-        print "CLIENT WAITING FOR GAME TO START!"
-        while True:
-            print self.data
-            m = re.search("(?<=\[STARTGAME\|)([a-zA-Z0-9_]+\,?)*", self.data)
-            if m:
-                self.playerList = m.group(0).split(",")
-                self.data = re.sub("\[STARTGAME\|([a-zA-Z0-9_]+\,?)*\]", "", self.data)
-                print "STARTING A GAME WITH %s" % self.playerList
-                break
-            self.data = self.data + self.s.recv(1024)
+        None
+        #print "CLIENT WAITING FOR GAME TO START!"
+        #while True:
+        #    print self.data
+        #    m = re.search("(?<=\[STARTGAME\|)([a-zA-Z0-9_]+\,?)*", self.data)
+        #    if m:
+        #        self.playerList = m.group(0).split(",")
+        #        self.data = re.sub("\[STARTGAME\|([a-zA-Z0-9_]+\,?)*\]", "", self.data)
+        #        print "STARTING A GAME WITH %s" % self.playerList
+        #        break
+        #    self.data = self.data + self.s.recv(1024)
 
-            #print self.data
-        print "STARTING THE GAME"
+        #    #print self.data
+        #print "STARTING THE GAME"
 
     def waitInLobby(self):
 
@@ -119,12 +121,33 @@ class Client():
 
         while True:
 
+            readable , writable, exceptional = select.select([self.s], [], [], 1)
+            if len(readable) > 0:
+                new_data = readable[0].recv(1024)
+                if new_data:
+                    self.data = self.data + new_data
+                else:
+                    sys.exit(0)
+
             # GOOD GAME?
             m = re.search("(?<=\[GG\|)[a-zA-Z0-9_]+", self.data)
             if m:
                 self.data = re.sub("\[GG\|[a-zA-Z0-9_]+\]", "", self.data)
                 print "PLAYER %s WON!" % m.group(0)
                 break
+
+            # NEW GAME?
+            m = re.search("(?<=\[STARTGAME\|)([a-zA-Z0-9_]+\,?)*", self.data)
+            if m:
+                self.playerList = m.group(0).split(",")
+                self.data = re.sub("\[STARTGAME\|([a-zA-Z0-9_]+\,?)*\]", "", self.data)
+                print "STARTING A GAME WITH %s" % self.playerList
+                #break
+
+            m = re.search("(?<=\[PLAYERS\|)([a-zA-Z0-9]+\,?)+", self.data)
+            if m:
+                self.playerList = m.group(0).split(",")
+                self.data = re.sub("\[PLAYERS\|([a-zA-Z0-9_]+\,?)+\]", "", self.data)
 
             if self.data != "":
                 print self.data
@@ -170,8 +193,8 @@ class Client():
             if m:
                 self.data = re.sub("\[INVALID\|[^\]]+\]", "", self.data)
 
-            self.data = self.data + self.s.recv(1024)
-            time.sleep(1)
+            #self.data = self.data + self.s.recv(1024)
+            time.sleep(3)
 
     def run(self):
         serverAddress = (self.hostname, self.port)

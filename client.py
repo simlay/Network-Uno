@@ -194,7 +194,7 @@ class Client():
                 self.data = re.sub("\[INVALID\|[^\]]+\]", "", self.data)
 
             #self.data = self.data + self.s.recv(1024)
-            time.sleep(3)
+            #time.sleep(3)
 
     def run(self):
         serverAddress = (self.hostname, self.port)

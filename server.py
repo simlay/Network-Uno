@@ -166,8 +166,8 @@ class Server():
 
         already_played_NN = False
 
-        #played = False
-        lastIndex = -123
+        played = False
+        sent_go = False
 
         while len(self.playerList) > 1:
             playerIndex = playerIndex % len(self.playerOrder)
@@ -180,12 +180,12 @@ class Server():
             #print "TURN:", playerIndex, playerName
 
             #print "Player %s turn, top card %s" % (playerName, self.discardPile[-1])
-            message = "[GO|%s]" % self.discardPile[-1]
-            print "%s -> %s" % (playerName, message)
             try:
-                if lastIndex != playerIndex:
+                if not sent_go:
+                    message = "[GO|%s]" % self.discardPile[-1]
+                    print "%s -> %s" % (playerName, message)
                     connection.send(message)
-                    lastIndex = playerIndex
+                    sent_go = True
             except:
                 if connection in self.playerList:
                     print "SENDING GO FAILD: Connection %s probably closed" % (self.playerList[connection])
@@ -269,13 +269,18 @@ class Server():
                             del self.lobby_clients[s]
 
 
+            m = re.search("(?<=\[CHAT\|)[[^\]]+", data)
+            if m:
+                chatMessage = m.group(0)
+                message = "[CHAT|%s]" % chatMessage
+                self.broadcast(message)
             try:
                 m = re.search("(?<=\[PLAY\|)[A-Z0-9]+", data_buffer[connection])
             except:
                 m = None
-                None
 
             if m:
+                sent_go = False
                 card = m.group(0)
                 #print playerName, message, card, self.playerCards[playerName], self.discardPile
                 if self.validateCard(card):
@@ -376,7 +381,7 @@ class Server():
                         connection.send(message)
                     except:
                         if connection in self.playerList:
-                            print "Connection %s, %s probably closed" % (connection, self.playerList[connection])
+                            print "385: Connection %s, %s probably closed" % (connection, self.playerList[connection])
                             del self.playerList[connection]
                         else:
                             print "Connection %s probably closed" % connection
